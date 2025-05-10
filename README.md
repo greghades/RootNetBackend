@@ -34,7 +34,7 @@ Este proyecto es una aplicación web desarrollada con **Django** y **Django REST
 
 ```bash
 git clone https://github.com/greghades/RootNetBackend.git
-cd backend
+cd tu-carpeta
 ```
 
 ### 2. Crear archivo `.env`
