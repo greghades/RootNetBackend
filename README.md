@@ -133,5 +133,6 @@ docker-compose down -v
 - [Docker Compose](https://docs.docker.com/compose/)
 - Python ≥ 3.9 (solo si se usa localmente fuera de Docker)
 
----
-
+--- 
+## 🌐 Documentacion de Endpoints
+- [Postman Documentation](https://documenter.getpostman.com/view/22630596/2sB2j98UwP)
