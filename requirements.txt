@@ -1,5 +1,7 @@
 asgiref==3.8.1
+dj-database-url==2.3.0
 Django==5.1.7
+django-cors-headers==4.7.0
 django-environ==0.12.0
 django-redis==5.4.0
 djangorestframework==3.15.2
@@ -8,4 +10,5 @@ psycopg2==2.9.10
 psycopg2-binary==2.9.10
 redis==6.0.0
 sqlparse==0.5.3
+typing_extensions==4.13.2
 tzdata==2025.1
