@@ -34,6 +34,7 @@ DEFAULT_APPS = [
 
 LOCAL_APPS = [
     'aplications.authentication',
+    'aplications.posts',
 ]
 
 THIRD_PARTY_APPS = [
@@ -73,6 +74,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework.authentication.TokenAuthentication",
+    ),
+    # "DEFAULT_PERMISSION_CLASSES": [
+    #     "rest_framework.permissions.IsAuthenticated",
+    # ],
+    "DEFAULT_PAGINATION_CLASS": "aplications.posts.serializers.SocialMediaCursorPagination",
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
