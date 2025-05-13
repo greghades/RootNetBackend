@@ -9,13 +9,15 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
+import environ
+from datetime import timedelta
 from pathlib import Path
-
+import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR.parent, ".env"))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
@@ -38,9 +40,9 @@ LOCAL_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
-    'rest_framework',
-    'corsheaders',
-    'rest_framework.authtoken'
+    "rest_framework",
+    "corsheaders",
+    "rest_framework_simplejwt",
 ]
 
 INSTALLED_APPS = DEFAULT_APPS + LOCAL_APPS + THIRD_PARTY_APPS
@@ -87,13 +89,34 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.TokenAuthentication",
-    ),
-    # "DEFAULT_PERMISSION_CLASSES": [
-    #     "rest_framework.permissions.IsAuthenticated",
-    # ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
     "DEFAULT_PAGINATION_CLASS": "aplications.posts.serializers.SocialMediaCursorPagination",
+}
+
+
+# Configuración de JWT
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),  # Vida del token de acceso (1 hora)
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),  # Vida del token de refresco (7 días)
+    "ROTATE_REFRESH_TOKENS": True,  # Genera un nuevo refresh token al refrescar
+    "BLACKLIST_AFTER_ROTATION": True,  # Invalida el refresh token antiguo
+    "UPDATE_LAST_LOGIN": False,  # No actualiza last_login (opcional)
+    "ALGORITHM": "HS256",  # Algoritmo de firma
+    "SIGNING_KEY": env("SECRET_KEY"),  # Clave secreta para firmar el token
+    "VERIFYING_KEY": None,
+    "AUDIENCE": None,
+    "ISSUER": None,
+    "AUTH_HEADER_TYPES": ("Bearer",),  # Tipo de cabecera para el token
+    "USER_ID_FIELD": "id",  # Campo de identificación del usuario
+    "USER_ID_CLAIM": "user_id",  # Claim en el token para el ID del usuario
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
+    "TOKEN_OBTAIN_SERIALIZER": "aplications.authentication.serializers.CustomTokenObtainPairSerializer",
 }
 
 # Password validation
