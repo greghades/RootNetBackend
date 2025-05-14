@@ -26,7 +26,6 @@ class CreatePostView(CreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PostSerializer
 
-   
 
 
 class UpdatePostView(RetrieveUpdateAPIView):
