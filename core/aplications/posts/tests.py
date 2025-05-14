@@ -14,9 +14,10 @@ class PostTests(APITestCase):
         self.client = APIClient()
         self.user = CustomUser.objects.create_user(
             username="testuser",
+            email="testuser@example.com",
             password="testpassword",
         )
-        #self.client.force_authenticate(user=self.user)
+        # self.client.force_authenticate(user=self.user)
 
     # def test_create_post(self):
 
@@ -94,7 +95,7 @@ class PostTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {response.data["access"]}')
 
     def test_create_post_with_jwt(self):
-        url = reverse("post-list")
+        url = reverse("post-create")
         token_url = reverse("token_obtain_pair")
         token_response = self.client.post(
             token_url,
@@ -104,6 +105,7 @@ class PostTests(APITestCase):
         self.client.credentials(
             HTTP_AUTHORIZATION=f'Bearer {token_response.data["access"]}'
         )
+        print(token_response.data["access"])
         data = {
             "title": "Test Post",
             "content": "This is a test post.",
