@@ -24,7 +24,7 @@ class PostTests(APITestCase):
         data = {
             "title": "Test Post",
             "content": "This is a test post.",
-            "author": self.user.id,
+            "author": self.user.username,
         }
         response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -60,7 +60,7 @@ class PostTests(APITestCase):
         data = {
             "title": "Updated Title",
             "content": "Updated content.",
-            "author": self.user.id,
+            "author": self.user.username,
         }
 
         response = self.client.put(url, data, format="json")

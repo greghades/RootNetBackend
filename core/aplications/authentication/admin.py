@@ -11,7 +11,7 @@ class CustomUserAdmin(UserAdmin, admin.ModelAdmin):
     fieldsets = (
         (
             "Employee info",
-            {"fields": ("username", "email", "password", "name", "last_name")},
+            {"fields": ("username", "email", "password", "first_name", "last_name")},
         ),
     )
 
