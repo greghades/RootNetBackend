@@ -18,6 +18,7 @@ class ListPostsView(ListAPIView):
     """
     View to list all posts.
     """
+
     serializer_class = PostSerializer
     queryset = Post.objects.all()
     pagination_class = SocialMediaCursorPagination
@@ -28,7 +29,6 @@ class CreatePostView(CreateAPIView):
     View to create a new post.
     """
 
-  
     serializer_class = PostSerializer
 
 
@@ -37,7 +37,6 @@ class UpdatePostView(RetrieveUpdateAPIView):
     View to update or delete a post.
     """
 
-  
     serializer_class = PostSerializer
     queryset = Post.objects.all()
 
@@ -47,6 +46,5 @@ class DeletePostView(DestroyAPIView):
     View to delete a post.
     """
 
-  
     serializer_class = PostSerializer
     queryset = Post.objects.all()
