@@ -9,11 +9,20 @@ from .models import CodesVerification, CustomUser
 class CustomUserAdmin(UserAdmin, admin.ModelAdmin):
     list_display = ("id", "first_name", "last_name", "email", "date_joined")
     fieldsets = (
-        (
             "Employee info",
-            {"fields": ("username", "email", "password", "first_name", "last_name")},
+            {
+                "fields": (
+                    "id",
+                    "username",
+                    "email",
+                    "password",
+                    "first_name",
+                    "last_name",
+                )
+            },
         ),
-    )
+
+        
 
 
 admin.site.register(CustomUser, CustomUserAdmin)

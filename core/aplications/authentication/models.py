@@ -17,6 +17,7 @@ class CustomUser(AbstractUser):
     created_at = models.DateTimeField(default=timezone.now)
 
     USERNAME_FIELD = 'email'
+    
     REQUIRED_FIELDS = ['username', 'password']
 
     def __str__(self):
