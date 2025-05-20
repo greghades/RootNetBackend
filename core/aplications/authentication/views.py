@@ -4,11 +4,11 @@ from django.contrib.auth import authenticate, logout
 from django.contrib.sessions.models import Session
 from django.core.mail import EmailMultiAlternatives
 from rest_framework import generics, status
-from rest_framework.response import Response
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework.permissions import AllowAny
 
 from settings.base import EMAIL_HOST_USER
 
@@ -35,10 +35,10 @@ from .messages.responses_ok import (
 from .models import CodesVerification, CustomUser
 from .serializers import (
     CustomTokenObtainPairSerializer,
+    RegisterSerializer,
     UserSerializer,
     UserTokenSerializer,
     ValidateCodeSerializer,
-    RegisterSerializer,
 )
 
 # Create your views here.
@@ -76,6 +76,7 @@ class LoginView(TokenObtainPairView):
 class SignUpView(generics.GenericAPIView):
 
     serializer_class = RegisterSerializer
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
