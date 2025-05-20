@@ -9,7 +9,6 @@ class Post(models.Model):
     Represents a blog spost or article.
 
     Fields:
-        title (CharField): The title of the post.
         content (TextField): The main content of the post.
         author (ForeignKey): Reference to the CustomUser who created the post.
         image (ImageField): Optional image associated with the post.
@@ -21,12 +20,12 @@ class Post(models.Model):
     content = models.TextField()
     author = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     image = models.ImageField(upload_to="posts/images/", null=True, blank=True)
-    tag = models.ManyToManyField("Tags", blank=True)
+    tag = models.ManyToManyField("Tags", blank=True, verbose_name="tags")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.title
+        return self.author.username
 
 
 class Comment(models.Model):
