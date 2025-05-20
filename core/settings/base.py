@@ -46,6 +46,7 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "corsheaders",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
 ]
 
 INSTALLED_APPS = DEFAULT_APPS + LOCAL_APPS + THIRD_PARTY_APPS
@@ -119,6 +120,7 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",  # Claim en el token para el ID del usuario
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",
+    "TOKEN_BLACKLIST_ENABLED": True,
     "TOKEN_OBTAIN_SERIALIZER": "aplications.authentication.serializers.CustomTokenObtainPairSerializer",
 }
 
@@ -158,6 +160,10 @@ STATIC_URL = "static/"
 import os
 
 STATIC_ROOT = os.path.join(BASE_DIR, "static/")
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 

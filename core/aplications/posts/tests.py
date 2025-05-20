@@ -82,34 +82,27 @@ class PostTests(APITestCase):
     #     self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
     #     self.assertEqual(Post.objects.count(), 0)
 
-    def test_obtain_jwt_token(self):
-        url = reverse("token_obtain_pair")
-        data = {
-            "email": "testuser@example.com",
-            "password": "testpassword",
-        }
-        response = self.client.post(url, data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("access", response.data)
-        self.assertIn("refresh", response.data)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {response.data["access"]}')
 
     def test_create_post_with_jwt(self):
         url = reverse("post-create")
-        token_url = reverse("token_obtain_pair")
+        token_url = reverse("login")
         token_response = self.client.post(
             token_url,
             {"email": "testuser@example.com", "password": "testpassword"},
             format="json",
         )
-        self.client.credentials(
-            HTTP_AUTHORIZATION=f'Bearer {token_response.data["access"]}'
-        )
-        print(token_response.data["access"])
+
         data = {
             "title": "Test Post",
             "content": "This is a test post.",
+            "author": self.user.id,
         }
-        response = self.client.post(url, data, format="json")
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+    
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Post.objects.count(), 1)

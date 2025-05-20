@@ -26,10 +26,6 @@ class UserTokenSerializer(serializers.ModelSerializer):
         fields = ("id", "username", "email", "first_name", "last_name")
 
 
-class LoginSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CustomUser
-        fields = ("email", "password")
 
 
 class RegisterSerializer(serializers.ModelSerializer):
