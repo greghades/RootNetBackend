@@ -4,7 +4,7 @@ from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import CustomUser
+from .models import CodesVerification, CustomUser, Reset_password
 
 # Create your tests here.
 
@@ -18,34 +18,49 @@ class AuthenticationTestCase(APITestCase):
             email="testuser@example.com",
             password="testpassword",
         )
-
-    def test_login(self):
-        # Test the login functionality
-        url = reverse("login")
-        data = {
+        self.user_data = {
+            "username": "testuser",
             "email": "testuser@example.com",
             "password": "testpassword",
         }
+
+    def _login_user(self, email=None, password=None):
+        # Helper method to log in the user and get the access token
+        url = reverse("login")
+        data = {
+            "email": email or self.user_data["email"],
+            "password": password or self.user_data["password"],
+        }
         response = self.client.post(url, data, format="json")
+        return response
+
+    def test_login(self):
+        # Test the login functionality
+        response = self._login_user()
+
+        access_token = response.data.get("access")
+        refresh_token = response.data.get("refresh")
+
+        self.assertIsNotNone(access_token)
+        self.assertIsNotNone(refresh_token)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
         self.assertIn("access", response.data)
         self.assertIn("refresh", response.data)
 
     def test_login_invalid_credentials(self):
         # Test login with invalid credentials
-        url = reverse("login")
-        data = {
-            "email": "testuser@example.com",
-            "password": "wrongpassword",
-        }
-        response = self.client.post(url, data, format="json")
+        response = self._login_user(
+            email="testuser@example.com", password="wrongpassword"
+        )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(
             response.data["Message"],
             "invalid credentials",
         )
-    
-    def sing_up(self):
+
+    def sign_up(self):
         # Test the signup functionality
         url = reverse("signup")
         data = {
@@ -61,14 +76,9 @@ class AuthenticationTestCase(APITestCase):
 
     def test_logout(self):
         # Test the logout functionality
-        url_login = reverse("login")
-        data = {
-            "email": "testuser@example.com",
-            "password": "testpassword",
-        }
-        response = self.client.post(url_login, data, format="json")
+        response = self._login_user()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("access", response.data)
+        refresh_token = response.data["refresh"]
 
         refresh_token = RefreshToken(response.data["refresh"])
         jti = refresh_token["jti"]
@@ -88,3 +98,91 @@ class AuthenticationTestCase(APITestCase):
             token__jti=jti,
         ).exists()
         self.assertTrue(blacklisted)
+
+    def test_send_password_reset_email(self):
+        # Test sending password reset email
+
+        response = self._login_user()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        url = reverse("send-code")
+        data = {
+            "email": "testuser@example.com",
+        }
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {response.data['access']}",
+        )
+        self.assertEqual(response.data["Message"], "Email Send")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_validate_code(self):
+        # Test validating the password reset code
+        url = reverse("validate-code")
+        response = self._login_user()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        code = CodesVerification.objects.create(
+            changePasswordCode="123456",
+            user=self.user,
+        )
+        data = {"code": code.changePasswordCode}
+
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data["Validated"], True)
+
+    def test_reset_password(self):
+        # Test resetting the password
+        url = reverse("reset-password")
+
+        response = self._login_user()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = {
+            "new_password": "newpassword123",
+            "confirm_password": "newpassword123",
+        }
+
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["Message"], "Password changed successfully")
+
+    def test_password_must_be_same(self):
+        # Test that the new password and confirm password must be the same
+        url = reverse("reset-password")
+
+        response = self._login_user()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = {
+            "new_password": "newpassword123",
+            "confirm_password": "differentpassword",
+        }
+
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["Message"],
+            "The new password must be the same as the old one",
+        )

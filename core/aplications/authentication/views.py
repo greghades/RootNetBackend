@@ -1,18 +1,15 @@
 from datetime import datetime
 
-from django.contrib.auth import authenticate, logout
-from django.contrib.sessions.models import Session
+from django.contrib.auth import authenticate
 from django.core.mail import EmailMultiAlternatives
 from rest_framework import generics, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework.permissions import AllowAny
-
 from settings.base import EMAIL_HOST_USER
 
-from .helpers.content_emails import PASSWORD_RESET
+from .helpers.content_emails import get_email_content
 from .helpers.randCodes import generatedCode
 from .messages.responses_error import (
     CHANGED_PASSWORD_ERROR,
@@ -21,6 +18,7 @@ from .messages.responses_error import (
     LOGIN_CREDENTIALS_REQUIRED_ERROR,
     LOGOUT_ERROR,
     NOT_FOUND_USER,
+    PASSWORD_MUST_BE_SAME,
 )
 from .messages.responses_ok import (
     CODE_VALIDATED,
@@ -106,33 +104,18 @@ class LogoutView(generics.GenericAPIView):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
-class UpdateUser(generics.RetrieveUpdateAPIView):
-
+class UpdateCurrentUserView(generics.GenericAPIView):
     serializer_class = UserTokenSerializer
-    queryset = CustomUser.objects.all()
 
     def put(self, request, *args, **kwargs):
-
+        user = request.user
+        serializer = self.get_serializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(
-            {"data": request.data, "message": UPDATE_OK},
-            status=status.HTTP_202_ACCEPTED,
+            {"user": serializer.data, "message": "Usuario actualizado correctamente."},
+            status=status.HTTP_200_OK,
         )
-
-
-class ListUsers(generics.ListAPIView):
-    serializer_class = UserSerializer
-    queryset = CustomUser.objects.order_by("id")
-
-
-class DeleteView(generics.GenericAPIView):
-
-    def delete(self, request, pk):
-        user = CustomUser.objects.get(id=pk)
-        if user:
-            user.delete()
-            return Response(DELETED_USER, status=status.HTTP_200_OK)
-        else:
-            return Response(NOT_FOUND_USER, status=status.HTTP_404_NOT_FOUND)
 
 
 class SendCodeResetPassword(generics.GenericAPIView):
@@ -143,20 +126,19 @@ class SendCodeResetPassword(generics.GenericAPIView):
             user = CustomUser.objects.get(email=email)
             if user:
                 mailReset = EmailMultiAlternatives(
-                    "Reset password", "Abroad", EMAIL_HOST_USER, [email]
+                    "Reset password", "Rootnet Service", EMAIL_HOST_USER, [email]
                 )
 
                 code = CodesVerification(changePasswordCode=generatedCode(), user=user)
+
                 code.save()
 
-                mailReset.attach_alternative(
-                    f"<h1>Your verification Code: {code.changePasswordCode}</h1>",
-                    "text/html",
-                )
+                mailReset.attach_alternative(get_email_content(code), "text/html")
                 mailReset.send()
 
                 return Response(EMAIL_SEND, status=status.HTTP_200_OK)
-        except:
+        except Exception as e:
+            print(e)
             return Response(
                 LOGIN_CREDENTIALS_ERROR, status=status.HTTP_401_UNAUTHORIZED
             )
@@ -171,6 +153,8 @@ class ValidationCodeView(generics.GenericAPIView):
             )
             serializerValidate = ValidateCodeSerializer(code_database)
             if code_database is not None:
+                CodesVerification.delete(code_database)
+
                 return Response(
                     {
                         "Validated": CODE_VALIDATED,
@@ -186,10 +170,17 @@ class ValidationCodeView(generics.GenericAPIView):
 
 class ResetPasswordView(generics.GenericAPIView):
     def post(self, request):
-        userId = request.data.get("user", None)
-        new_password = request.data.get("password", None)
-        if new_password is not None and userId is not None:
-            user = CustomUser.objects.get(id=userId)
+
+        new_password = request.data.get("new_password", None)
+        confirm_new_password = request.data.get("confirm_password", None)
+
+        if new_password is not None and confirm_new_password is not None:
+            if new_password != confirm_new_password:
+                return Response(
+                    PASSWORD_MUST_BE_SAME,
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            user = CustomUser.objects.get(id=request.user.id)
             user.set_password(new_password)
             user.save()
             return Response(PASSWORD_CHANGED, status=status.HTTP_200_OK)
