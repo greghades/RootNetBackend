@@ -8,4 +8,6 @@ CODER_VERIFICATION_ERROR = {"Validated":False}
 
 CHANGED_PASSWORD_ERROR = {'Message':'Something went wrong'}
 
+PASSWORD_MUST_BE_SAME = {"Message":"The new password must be the same as the old one"}
+
 NOT_FOUND_USER = {"Message":"User not found"}

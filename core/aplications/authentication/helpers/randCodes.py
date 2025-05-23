@@ -2,5 +2,5 @@ import random
 
 
 def generatedCode():
-    code = random.randrange(0000,9999)
+    code = random.randrange(1000,9999)
     return code
