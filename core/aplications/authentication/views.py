@@ -150,6 +150,7 @@ class ValidationCodeView(generics.GenericAPIView):
         try:
             code_database = CodesVerification.objects.get(
                 changePasswordCode=code_request
+                ,
             )
             serializerValidate = ValidateCodeSerializer(code_database)
             if code_database is not None:
