@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from rest_framework import status
 
 # Create your views here.
 from rest_framework.authentication import TokenAuthentication
@@ -10,11 +11,10 @@ from rest_framework.generics import (
 )
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.views import APIView
 
 from .models import Comment, Like, Post
-from .serializers import PostSerializer, SocialMediaCursorPagination, CommentSerializer
+from .serializers import CommentSerializer, PostSerializer, SocialMediaCursorPagination
 
 
 class ListPostsView(ListAPIView):
@@ -52,6 +52,7 @@ class DeletePostView(DestroyAPIView):
     serializer_class = PostSerializer
     queryset = Post.objects.all()
 
+
 # Create a new comment
 
 
@@ -78,10 +79,11 @@ class CommentsView(APIView):
                 {"error": "Post not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
     def post(self, request, *args, **kwargs):
 
-        post_id = request.data.get("post_id",None)
-        content = request.data.get("content",None)
+        post_id = request.data.get("post_id", None)
+        content = request.data.get("content", None)
 
         if not post_id or not content:
             return Response(
@@ -90,11 +92,7 @@ class CommentsView(APIView):
             )
         try:
             post = Post.objects.get(id=post_id)
-            Comment.objects.create(
-                author=request.user,
-                post=post,
-                content=content
-            )
+            Comment.objects.create(author=request.user, post=post, content=content)
 
             return Response(
                 {
@@ -110,4 +108,59 @@ class CommentsView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-    
+    def patch(self, request, *args, **kwargs):
+
+        comment_id = request.data.get("comment_id", None)
+        content = request.data.get("content", None)
+
+        if not comment_id or not content:
+            return Response(
+                {"error": "comment_id and content are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            comment = Comment.objects.get(id=comment_id)
+            comment.content = content
+            comment.save()
+
+            return Response(
+                {
+                    "message": "Comment updated successfully",
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Comment.DoesNotExist:
+            return Response(
+                {
+                    "message": "Comment not found",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    def delete(self, request, *args, **kwargs):
+        comment_id = request.data.get("comment_id", None)
+
+        if not comment_id:
+            return Response(
+                {"error": "comment_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            comment = Comment.objects.get(id=comment_id)
+            comment.delete()
+
+            return Response(
+                {
+                    "message": "Comment deleted successfully",
+                },
+                status=status.HTTP_204_NO_CONTENT,
+            )
+        except Comment.DoesNotExist:
+            return Response(
+                {
+                    "message": "Comment not found",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )

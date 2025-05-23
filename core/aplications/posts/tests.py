@@ -98,3 +98,61 @@ class PostTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+    
+    def test_edit_comment(self):
+        # Create a post and a comment first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+        comment = Comment.objects.create(
+            content="This is a test comment.",
+            post=post,
+            author=self.user,
+        )
+
+        url = reverse("comment-service")
+        token_response = self._login_user()
+
+        data = {
+            "comment_id": comment.id,
+            "content": "This is an edited comment.",
+        }
+        response = self.client.patch(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        comment.refresh_from_db()
+        self.assertEqual(comment.content, "This is an edited comment.")
+    
+    def test_delete_comment(self):
+        # Create a post and a comment first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+        comment = Comment.objects.create(
+            content="This is a test comment.",
+            post=post,
+            author=self.user,
+        )
+
+        url = reverse("comment-service")
+        token_response = self._login_user()
+
+        data = {
+            "comment_id": comment.id,
+        }
+        response = self.client.delete(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Comment.objects.count(), 0)
