@@ -9,9 +9,12 @@ from rest_framework.generics import (
     RetrieveUpdateAPIView,
 )
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.views import APIView
 
 from .models import Comment, Like, Post
-from .serializers import PostSerializer, SocialMediaCursorPagination
+from .serializers import PostSerializer, SocialMediaCursorPagination, CommentSerializer
 
 
 class ListPostsView(ListAPIView):
@@ -48,3 +51,63 @@ class DeletePostView(DestroyAPIView):
 
     serializer_class = PostSerializer
     queryset = Post.objects.all()
+
+# Create a new comment
+
+
+class CommentsView(APIView):
+
+    def get(self, request, *args, **kwargs):
+
+        post_id = request.query_params.get("post_id", None)
+
+        if not post_id:
+            return Response(
+                {"error": "post_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            post = Post.objects.get(id=post_id)
+            comments = Comment.objects.filter(post=post)
+
+            serializer = CommentSerializer(comments, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Post.DoesNotExist:
+            return Response(
+                {"error": "Post not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+    def post(self, request, *args, **kwargs):
+
+        post_id = request.data.get("post_id",None)
+        content = request.data.get("content",None)
+
+        if not post_id or not content:
+            return Response(
+                {"error": "post_id and content are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            post = Post.objects.get(id=post_id)
+            Comment.objects.create(
+                author=request.user,
+                post=post,
+                content=content
+            )
+
+            return Response(
+                {
+                    "message": "Comment created successfully",
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        except Post.DoesNotExist:
+            return Response(
+                {
+                    "message": "Post not found",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    

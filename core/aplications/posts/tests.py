@@ -12,90 +12,34 @@ from .models import Comment, Like, Post
 class PostTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
+        self.user_data = {
+            "email": "testuser@example.com",
+            "password": "testpassword",
+        }
         self.user = CustomUser.objects.create_user(
             username="testuser",
-            email="testuser@example.com",
-            password="testpassword",
+            email=self.user_data["email"],
+            password=self.user_data["password"],
         )
-        # self.client.force_authenticate(user=self.user)
 
-    # def test_create_post(self):
+    def _login_user(self):
+        # Helper method to log in the user and get the access token
+        url = reverse("login")
 
-    #     url = reverse("post-create")
-    #     data = {
-    #         "title": "Test Post",
-    #         "content": "This is a test post.",
-    #         "author": self.user.id,
-    #     }
-    #     response = self.client.post(url, data, format="json")
-    #     self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-    #     self.assertEqual(Post.objects.count(), 1)
-    #     post = Post.objects.get()
-    #     self.assertEqual(post.title, "Test Post")
-    #     self.assertEqual(post.content, "This is a test post.")
-    #     self.assertEqual(post.author, self.user)
+        data = {
+            "email": self.user_data["email"],
+            "password": self.user_data["password"],
+        }
+        response = self.client.post(url, data, format="json")
 
-    # def test_pagination(self):
-    #     # Crea más datos para probar paginación
-    #     for i in range(25):  # Más que el page_size (20)
-    #         Post.objects.create(
-    #             title=f"Post {i}",
-    #             content=f"This is post number {i}.",
-    #             author=self.user,
-    #         )
-
-    #     url = reverse("post-list")
-    #     response = self.client.get(url)
-
-    #     self.assertEqual(response.status_code, status.HTTP_200_OK)
-    #     self.assertEqual(len(response.data["results"]), 10)  # page_size
-    #     self.assertIsNotNone(response.data["next"])  # Hay más páginas
-
-    # def test_update_post(self):
-    #     post = Post.objects.create(
-    #         title="Old Title",
-    #         content="Old content.",
-    #         author=self.user,
-    #     )
-    #     url = reverse("post-update", args=[post.id])
-    #     data = {
-    #         "title": "Updated Title",
-    #         "content": "Updated content.",
-    #         "author": self.user.id,
-    #     }
-
-    #     response = self.client.put(url, data, format="json")
-
-    #     self.assertEqual(response.status_code, status.HTTP_200_OK)
-    #     post.refresh_from_db()
-    #     self.assertEqual(post.title, "Updated Title")
-    #     self.assertEqual(post.content, "Updated content.")
-
-    # def test_delete_post(self):
-    #     post = Post.objects.create(
-    #         title="Post to delete",
-    #         content="This post will be deleted.",
-    #         author=self.user,
-    #     )
-    #     url = reverse("post-delete", args=[post.id])
-    #     response = self.client.delete(url)
-    #     self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-    #     self.assertEqual(Post.objects.count(), 0)
-
+        return response
 
     def test_create_post_with_jwt(self):
         url = reverse("post-create")
-        token_url = reverse("login")
-        token_response = self.client.post(
-            token_url,
-            {"email": "testuser@example.com", "password": "testpassword"},
-            format="json",
-        )
+        token_response = self._login_user()
 
         data = {
-            "title": "Test Post",
             "content": "This is a test post.",
-            "author": self.user.username,
         }
         response = self.client.post(
             url,
@@ -103,6 +47,54 @@ class PostTests(APITestCase):
             format="json",
             HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
         )
-    
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Post.objects.count(), 1)
+
+    def test_add_comment_to_post(self):
+        # Create a post first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+
+        url = reverse("comment-service")
+        token_response = self._login_user()
+
+        data = {
+            "content": "This is a test comment.",
+            "post_id": post.id,
+        }
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Comment.objects.count(), 1)
+
+    def test_get_comments_for_post(self):
+        # Create a post and a comment first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+        Comment.objects.create(
+            content="This is a test comment.",
+            post=post,
+            author=self.user,
+        )
+
+        url = reverse("comment-service") + f"?post_id={post.id}"
+        token_response = self._login_user()
+
+        response = self.client.get(
+            url,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)

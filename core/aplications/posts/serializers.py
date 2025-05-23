@@ -35,6 +35,30 @@ class PostSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.SlugRelatedField(
+        slug_field="username", queryset=CustomUser.objects.all(), required=False
+    )
+
+    class Meta:
+        model = Comment
+        fields = "__all__"
+        read_only_fields = ["created_at", "updated_at"]
+
+    def validate_author(self, value):
+        request = self.context.get("request")
+        if request and request.user != value:
+            raise serializers.ValidationError(
+                "El usuario debe ser el usuario autenticado."
+            )
+        return value
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        if request:
+            validated_data["author"] = request.user
+        return super().create(validated_data)
+
 class SocialMediaCursorPagination(CursorPagination):
     page_size = 10
     ordering = "-created_at"  # Ordena por fecha de creación descendente
