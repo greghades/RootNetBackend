@@ -42,6 +42,6 @@ class Reset_password(models.Model):
 class CodesVerification(models.Model):
     changePasswordCode = models.CharField(max_length=10, unique=True)
     user = models.ForeignKey(CustomUser, null=True, on_delete=models.SET_NULL)
-
+    is_used = models.BooleanField(default=False)
     def __str__(self):
         return f"{self.user}"
