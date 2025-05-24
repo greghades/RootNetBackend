@@ -49,4 +49,5 @@ urlpatterns = [
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("api/v1/auth/", include("aplications.authentication.urls")),
     path("api/v1/posts/", include("aplications.posts.urls")),
+    path("api/v1/users/", include("aplications.users.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
