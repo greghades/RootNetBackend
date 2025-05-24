@@ -5,7 +5,7 @@ from django.core.mail import EmailMultiAlternatives
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import generics, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -106,7 +106,7 @@ class LoginView(TokenObtainPairView):
 class SignUpView(generics.GenericAPIView):
 
     serializer_class = RegisterSerializer
-
+    permission_classes = [AllowAny]
     @swagger_auto_schema(
         operation_summary="Sign up",
         operation_description="Register a new user.",
@@ -135,7 +135,7 @@ class SignUpView(generics.GenericAPIView):
 
 
 class LogoutView(generics.GenericAPIView):
-    permission_classes = (IsAuthenticated,)
+    
 
     @swagger_auto_schema(
         operation_summary="Logout",
@@ -206,25 +206,32 @@ class DeleteView(generics.GenericAPIView):
 
 
 class SendCodeResetPassword(generics.GenericAPIView):
+    """
+    Vista para enviar un código de recuperación de contraseña al correo del usuario.
+    """
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
-        operation_summary="Send password reset code",
-        operation_description="Send a password reset code to the user's email.",
+        operation_summary="Enviar código de recuperación",
+        operation_description="Envía un código de recuperación de contraseña al correo electrónico del usuario.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=["email"],
             properties={
                 "email": openapi.Schema(
-                    type=openapi.TYPE_STRING, description="User email"
+                    type=openapi.TYPE_STRING, description="Correo electrónico del usuario"
                 ),
             },
         ),
         responses={
-            200: openapi.Response(description="Email sent"),
-            401: openapi.Response(description="Invalid credentials"),
+            200: openapi.Response(description="Correo enviado"),
+            401: openapi.Response(description="Credenciales inválidas"),
         },
     )
     def post(self, request):
+        """
+        Envía un código de recuperación de contraseña al correo del usuario si existe.
+        """
         email = request.data.get("email", None)
         try:
             user = CustomUser.objects.get(email=email)
@@ -234,7 +241,6 @@ class SendCodeResetPassword(generics.GenericAPIView):
                 )
 
                 code = CodesVerification(changePasswordCode=generatedCode(), user=user)
-
                 code.save()
 
                 mailReset.attach_alternative(get_email_content(code), "text/html")
@@ -249,84 +255,180 @@ class SendCodeResetPassword(generics.GenericAPIView):
 
 
 class ValidationCodeView(generics.GenericAPIView):
-
+    """
+    Vista para validar el código de recuperación enviado al correo del usuario.
+    """
+    permission_classes = [AllowAny]
     @swagger_auto_schema(
-        operation_summary="Validate reset code",
-        operation_description="Validate the code sent to the user's email.",
+        operation_summary="Validar código de recuperación",
+        operation_description="Valida el código de recuperación enviado al correo electrónico del usuario.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=["code"],
             properties={
                 "code": openapi.Schema(
-                    type=openapi.TYPE_STRING, description="Verification code"
+                    type=openapi.TYPE_STRING, description="Código de verificación recibido por correo"
                 ),
             },
         ),
         responses={
-            202: openapi.Response(description="Code validated"),
-            401: openapi.Response(description="Invalid code"),
+            202: openapi.Response(description="Código validado"),
+            401: openapi.Response(description="Código inválido o expirado"),
         },
     )
     def post(self, request):
+        """
+        Valida el código de recuperación. Si es correcto y no ha sido usado, lo marca como usado.
+        """
         code_request = request.data.get("code", None)
         try:
             code_database = CodesVerification.objects.get(
-                changePasswordCode=code_request
-                ,
+                changePasswordCode=code_request, is_used=False  # Solo códigos no usados
             )
-            serializerValidate = ValidateCodeSerializer(code_database)
-            if code_database is not None:
-                CodesVerification.delete(code_database)
+            # Marca el código como validado (usado)
+            code_database.is_used = True
+            code_database.dateUsed = datetime.now()
+            code_database.save()
 
-                return Response(
-                    {
-                        "Validated": CODE_VALIDATED,
-                        "Entity": serializerValidate.data,
-                    },
-                    status=status.HTTP_202_ACCEPTED,
-                )
-        except:
+            serializerValidate = ValidateCodeSerializer(code_database)
+            return Response(
+                {
+                    "Validated": CODE_VALIDATED,
+                    "Entity": serializerValidate.data,
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+        except CodesVerification.DoesNotExist:
             return Response(
                 CODER_VERIFICATION_ERROR, status=status.HTTP_401_UNAUTHORIZED
             )
 
 
 class ResetPasswordView(generics.GenericAPIView):
+    """
+    Vista para cambiar la contraseña del usuario usando un código previamente validado.
+    """
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
-        operation_summary="Reset password",
-        operation_description="Reset the user's password using a valid code.",
+        operation_summary="Restablecer contraseña",
+        operation_description="Permite al usuario cambiar su contraseña si el código de recuperación fue validado.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=["user", "password"],
+            required=["code", "email", "new_password", "confirm_password"],
             properties={
-                "user": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="User ID"
+                "code": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Código de verificación validado"
                 ),
-                "password": openapi.Schema(
-                    type=openapi.TYPE_STRING, description="New password"
+                "email": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Correo electrónico del usuario"
+                ),
+                "new_password": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Nueva contraseña"
+                ),
+                "confirm_password": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Confirmación de la nueva contraseña"
                 ),
             },
         ),
         responses={
-            200: openapi.Response(description="Password changed"),
-            400: openapi.Response(description="Bad request"),
+            200: openapi.Response(description="Contraseña cambiada"),
+            400: openapi.Response(description="Datos inválidos o contraseñas no coinciden"),
+            401: openapi.Response(description="Código inválido o expirado"),
+            404: openapi.Response(description="Usuario no encontrado"),
         },
     )
     def post(self, request):
-
+        """
+        Cambia la contraseña del usuario si el código fue validado y no ha sido usado antes.
+        El código se elimina después de usarse para mayor seguridad.
+        """
+        code = request.data.get("code", None)
+        email = request.data.get("email", None)
         new_password = request.data.get("new_password", None)
         confirm_new_password = request.data.get("confirm_password", None)
 
-        if new_password is not None and confirm_new_password is not None:
-            if new_password != confirm_new_password:
-                return Response(
-                    PASSWORD_MUST_BE_SAME,
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            user = CustomUser.objects.get(id=request.user.id)
+        if not all([code, email, new_password, confirm_new_password]):
+            return Response(CHANGED_PASSWORD_ERROR, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password != confirm_new_password:
+            return Response(
+                PASSWORD_MUST_BE_SAME,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = CustomUser.objects.get(email=email)
+            code_obj = CodesVerification.objects.get(
+                changePasswordCode=code,
+                user=user,
+                is_used=True,  # Solo códigos ya validados
+            )
+            # Cambia la contraseña solo si el código fue validado
             user.set_password(new_password)
             user.save()
+            code_obj.delete()  # Elimina el código después de usarlo
             return Response(PASSWORD_CHANGED, status=status.HTTP_200_OK)
-        else:
-            return Response(CHANGED_PASSWORD_ERROR, status=status.HTTP_400_BAD_REQUEST)
+        except CustomUser.DoesNotExist:
+            return Response(NOT_FOUND_USER, status=status.HTTP_404_NOT_FOUND)
+        except CodesVerification.DoesNotExist:
+            return Response(
+                CODER_VERIFICATION_ERROR, status=status.HTTP_401_UNAUTHORIZED
+            )
+
+
+class ChangePasswordView(generics.GenericAPIView):
+    """
+    Vista para que el usuario autenticado cambie su contraseña desde los ajustes.
+    """
+
+    
+    @swagger_auto_schema(
+        operation_summary="Cambiar contraseña (ajustes)",
+        operation_description="Permite al usuario autenticado cambiar su contraseña proporcionando la contraseña actual y la nueva.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["current_password", "new_password", "confirm_password"],
+            properties={
+                "current_password": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Contraseña actual"
+                ),
+                "new_password": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Nueva contraseña"
+                ),
+                "confirm_password": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Confirmación de la nueva contraseña",
+                ),
+            },
+        ),
+        responses={
+            200: openapi.Response(description="Contraseña cambiada correctamente"),
+            400: openapi.Response(
+                description="Datos inválidos o contraseñas no coinciden"
+            ),
+            401: openapi.Response(description="Contraseña actual incorrecta"),
+        },
+        security=[{"Bearer": []}],
+    )
+    def post(self, request):
+        user = request.user
+        current_password = request.data.get("current_password")
+        new_password = request.data.get("new_password")
+        confirm_password = request.data.get("confirm_password")
+
+        if not user.check_password(current_password):
+            return Response(
+                {"error": "Contraseña actual incorrecta."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        if new_password != confirm_password:
+            return Response(
+                {"error": "Las contraseñas no coinciden."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user.set_password(new_password)
+        user.save()
+        return Response(
+            {"message": "Contraseña cambiada correctamente."}, status=status.HTTP_200_OK
+        )

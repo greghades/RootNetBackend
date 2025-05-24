@@ -30,6 +30,24 @@ class UserViewTestCase(APITestCase):
         self.assertEqual(response.data["username"], self.user1.username)
         self.assertEqual(response.data["email"], self.user1.email)
 
+    def test_get_other_user_profile(self):
+
+        url = reverse("follow") 
+        data = {"followed": self.user2.id}
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        data = {"followed": self.user3.id}
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        url = reverse("user-profile", args=[self.user2.username])
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["username"], self.user2.username)
+
+        print(response.data)
+
     def test_follow_user(self):
         url = reverse("follow")
         data = {"followed": self.user2.id}
@@ -55,8 +73,6 @@ class UserViewTestCase(APITestCase):
         self.client.force_authenticate(user=self.user1)
         url = reverse("profile")
         response = self.client.get(url)
-        
-
 
     def test_update_user_profile(self):
         url = reverse("profile")

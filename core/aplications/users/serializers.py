@@ -11,11 +11,23 @@ class FollowSerializer(ModelSerializer):
         model = Follow
         fields = ("follower", "followed")
 
-
-class CustomUserSerializer(ModelSerializer):
-
+class CustomUserProfileSerializer(ModelSerializer):
     followers_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
+    date_joined = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
+
+    class Meta:
+        model = CustomUser
+        fields = ("username", "first_name", "last_name", "profile_photo", "date_joined","followers_count", "following_count")
+
+    def get_followers_count(self, obj):
+        return obj.followers.count()
+
+    def get_following_count(self, obj):
+        return obj.following.count()
+
+
+class CustomUserSettingsSerializer(ModelSerializer):
 
     class Meta:
         model = CustomUser
@@ -34,9 +46,3 @@ class CustomUserSerializer(ModelSerializer):
             "following"
             
         ]
-
-    def get_followers_count(self, obj):
-        return obj.followers.count()
-
-    def get_following_count(self, obj):
-        return obj.following.count()

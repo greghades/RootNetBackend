@@ -1,57 +1,88 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework import generics, status
 from rest_framework.response import Response
 from .models import Follow
-from .serializers import FollowSerializer, CustomUserSerializer
+from .serializers import (
+    FollowSerializer,
+    CustomUserSettingsSerializer,
+    CustomUserProfileSerializer,
+    CustomUser
+)
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 # Create your views here.
 
 
-class ProfileView(generics.GenericAPIView):
+class ProfileSettingsView(generics.GenericAPIView):
+    """
+    Vista para obtener y actualizar el perfil del usuario autenticado.
+    """
+
     @swagger_auto_schema(
-        operation_summary="Get user profile",
-        operation_description="Retrieves the authenticated user's profile. Requires a valid JWT token.",
+        operation_summary="Obtener perfil de usuario",
+        operation_description="Recupera el perfil del usuario autenticado. Requiere un token JWT válido.",
         responses={
-            200: CustomUserSerializer,
+            200: CustomUserSettingsSerializer,
             401: openapi.Response(description="Unauthorized"),
         },
         security=[{"Bearer": []}],
     )
     def get(self, request, *args, **kwargs):
+        """
+        Devuelve los datos del perfil del usuario autenticado.
+        """
         user = request.user
-        serializer = CustomUserSerializer(user)
+        serializer = CustomUserSettingsSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
-        operation_summary="Update user profile",
-        operation_description="Updates the authenticated user's profile. Requires a valid JWT token.",
-        request_body=CustomUserSerializer,
+        operation_summary="Actualizar perfil de usuario",
+        operation_description="Actualiza el perfil del usuario autenticado. Requiere un token JWT válido.",
+        request_body=CustomUserSettingsSerializer,
         responses={
-            200: CustomUserSerializer,
+            200: CustomUserSettingsSerializer,
             400: openapi.Response(description="Bad Request"),
         },
         security=[{"Bearer": []}],
     )
     def put(self, request, *args, **kwargs):
+        """
+        Actualiza los datos del perfil del usuario autenticado.
+        """
         user = request.user
-        serializer = CustomUserSerializer(user, data=request.data, partial=True)
+        serializer = CustomUserSettingsSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class UserProfileView(generics.GenericAPIView):
+    """
+    Vista para obtener el perfil de un usuario.
+    """
+
+    def get(self, request, username, *args, **kwargs):
+
+        if not username:
+            return Response({"error": "Username is required"}, status=status.HTTP_400_BAD_REQUEST)
+        user = get_object_or_404(CustomUser, username=username)
+        serializer = CustomUserProfileSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class FollowUserView(generics.GenericAPIView):
+    """
+    Vista para seguir a otro usuario.
+    """
+
     @swagger_auto_schema(
-        operation_summary="Follow a user",
-        operation_description="Authenticated user follows another user. Requires a valid JWT token.",
+        operation_summary="Seguir a un usuario",
+        operation_description="El usuario autenticado sigue a otro usuario. Requiere un token JWT válido.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=["followed"],
             properties={
-                "followed": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the user to follow"),
+                "followed": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del usuario a seguir"),
             },
         ),
         responses={
@@ -61,6 +92,9 @@ class FollowUserView(generics.GenericAPIView):
         security=[{"Bearer": []}],
     )
     def post(self, request, *args, **kwargs) -> Response:
+        """
+        Permite al usuario autenticado seguir a otro usuario.
+        """
         follow_data = {
             "follower": request.user.id,
             "followed": request.data.get("followed", None)
@@ -73,14 +107,18 @@ class FollowUserView(generics.GenericAPIView):
 
 
 class UnfollowUserView(generics.GenericAPIView):
+    """
+    Vista para dejar de seguir a un usuario.
+    """
+
     @swagger_auto_schema(
-        operation_summary="Unfollow a user",
-        operation_description="Authenticated user unfollows another user. Requires a valid JWT token.",
+        operation_summary="Dejar de seguir a un usuario",
+        operation_description="El usuario autenticado deja de seguir a otro usuario. Requiere un token JWT válido.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=["followed"],
             properties={
-                "followed": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the user to unfollow"),
+                "followed": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del usuario a dejar de seguir"),
             },
         ),
         responses={
@@ -90,12 +128,17 @@ class UnfollowUserView(generics.GenericAPIView):
         security=[{"Bearer": []}],
     )
     def post(self, request, *args, **kwargs) -> Response:
+        """
+        Permite al usuario autenticado dejar de seguir a otro usuario.
+        """
         try:
             follow = Follow.objects.get(
                 follower=request.user.id,
                 followed=request.data.get("followed", None)
             )
             follow.delete()
-            return Response({"message": "Unfollowed successfully"}, status=status.HTTP_200_OK)
-        except Follow.DoesNotExist as e:
-            return Response({"error": "Follow relationship does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"message": "Unfollowed successfully"}, status=status.HTTP_200_OK
+            )
+        except Follow.DoesNotExist:
+            return Response({"error": "The relationship does not exist"}, status=status.HTTP_400_BAD_REQUEST)

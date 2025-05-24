@@ -21,6 +21,11 @@ class PostTests(APITestCase):
             email=self.user_data["email"],
             password=self.user_data["password"],
         )
+        self.user_2 = CustomUser.objects.create_user(
+            username="testuser2",
+            email="testuser2@example.com",
+            password="testpassword",
+        )
 
     def _login_user(self):
         # Helper method to log in the user and get the access token
@@ -221,7 +226,6 @@ class PostTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Like.objects.count(), 1)
-    
 
     def test_favorite_post(self):
         # Create a post first
@@ -244,7 +248,7 @@ class PostTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-    
+
     def test_delete_favorite_post(self):
         # Create a post and favorite it first
         post = Post.objects.create(
@@ -271,7 +275,7 @@ class PostTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Favorite.objects.count(), 0)
-    
+
     def test_already_favorited_post(self):
         # Create a post and favorite it first
         post = Post.objects.create(
@@ -321,3 +325,68 @@ class PostTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+
+    def test_list_posts(self):
+        # Create a post first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+
+        url = reverse("post-list")
+        token_response = self._login_user()
+
+        response = self.client.get(
+            url,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['content'], post.content)
+
+    def test_get_owner_posts(self):
+        # Create a post first
+        post = Post.objects.create(
+            content="This is a test post 1.",
+            author=self.user,
+        )
+
+        post2 = Post.objects.create(
+            content="This is a test post 2.",
+            author=self.user,
+        )
+
+        post3 = Post.objects.create(
+            content="This is a test post 3.",
+            author=self.user_2,
+        )
+
+        url = reverse("post-owner") + "?user_id=" + str(self.user.id)
+        token_response = self._login_user()
+
+        response = self.client.get(
+            url,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['content'], post2.content)
+        self.assertEqual(response.data[1]['content'], post.content)
+        self.assertEqual(response.data[0]['author'], self.user.username)
+
+        url = reverse("post-owner") + "?user_id=" + str(self.user_2.id)
+        response = self.client.get(
+            url,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+        self.assertEqual(response.data[0]["content"], post3.content)
+        self.assertEqual(response.data[0]["author"], self.user_2.username)

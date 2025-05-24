@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
-    ListPostsView,
+    ListPostsOwnerView,
+    ListPostsFeedView,
     CreatePostView,
     UpdatePostView,
     DeletePostView,
@@ -10,10 +11,11 @@ from .views import (
 )
 
 urlpatterns = [
-    path("get-posts/", ListPostsView.as_view(), name="post-list"),
+    path("get-posts/", ListPostsFeedView.as_view(), name="post-list"),
+    path("get-owner-posts/", ListPostsOwnerView.as_view(), name="post-owner"),
     path("create/", CreatePostView.as_view(), name="post-create"),
-    path("update/<int:pk>/", UpdatePostView.as_view(), name="post-update"),
-    path("delete/<int:pk>/", DeletePostView.as_view(), name="post-delete"),
+    path("update/<int:post_id>/", UpdatePostView.as_view(), name="post-update"),
+    path("delete/<int:post_id>/", DeletePostView.as_view(), name="post-delete"),
     # Comments
     path("comments/", CommentsView.as_view(), name="comment-service"),
     # Likes

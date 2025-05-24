@@ -8,6 +8,7 @@ from .views import (
     SendCodeResetPassword,
     SignUpView,
     ValidationCodeView,
+    ChangePasswordView
 )
 
 urlpatterns = [
@@ -17,5 +18,6 @@ urlpatterns = [
     path("send-code/", SendCodeResetPassword.as_view(), name="send-code"),
     path("validate-code/", ValidationCodeView.as_view(), name="validate-code"),
     path("reset-password/", ResetPasswordView.as_view(), name="reset-password"),
+    path("change-password/", ChangePasswordView.as_view(), name="change-password"),
     
 ]

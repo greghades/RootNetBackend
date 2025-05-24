@@ -17,17 +17,23 @@ from .serializers import (
 )
 
 
-class ListPostsView(APIView):
+class ListPostsFeedView(APIView):
+    """
+    Vista para listar todas las publicaciones creadas por el usuario autenticado y por los usuarios que sigue.
+    """
 
     pagination_class = SocialMediaCursorPagination
 
     @swagger_auto_schema(
-        operation_summary="List posts",
-        operation_description="List all posts created by the user and by users they follow. Requires a valid JWT token.",
+        operation_summary="Listar publicaciones",
+        operation_description="Lista todas las publicaciones creadas por el usuario autenticado y por los usuarios que sigue. Requiere un token JWT válido.",
         responses={200: PostSerializer(many=True)},
         security=[{"Bearer": []}],
     )
     def get(self, request, *args, **kwargs):
+        """
+        Devuelve las publicaciones del usuario autenticado y de los usuarios que sigue.
+        """
         following_users = request.user.following.all()
         posts = Post.objects.filter(
             models.Q(author=request.user) | models.Q(author__in=following_users)
@@ -36,68 +42,116 @@ class ListPostsView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class ListPostsOwnerView(APIView):
+    """
+    Vista para listar todas las publicaciones.
+    """
+
+    pagination_class = SocialMediaCursorPagination
+
+    @swagger_auto_schema(
+        operation_summary="Listar todas las publicaciones",
+        operation_description="Lista todas las publicaciones del ususario.",
+        responses={200: PostSerializer(many=True)},
+        security=[{"Bearer": []}],
+    )
+    def get(self, request, *args, **kwargs):
+        """
+        Devuelve todas las publicaciones.
+        """
+        owner = request.query_params.get("user_id", None)
+        if owner is None:
+            return Response(
+                {"error": "owner parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        posts = Post.objects.filter(author=owner).order_by("-created_at")
+        serializer = PostSerializer(posts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 class CreatePostView(CreateAPIView):
+    """
+    Vista para crear una nueva publicación.
+    """
     serializer_class = PostSerializer
 
     @swagger_auto_schema(
-        operation_summary="Create a new post",
-        operation_description="Creates a new post. Requires a valid JWT token.",
+        operation_summary="Crear una publicación",
+        operation_description="Crea una nueva publicación. Requiere un token JWT válido.",
         request_body=PostSerializer,
         responses={
             201: PostSerializer,
-            400: openapi.Response(description="Bad Request"),
+            400: openapi.Response(description="Solicitud incorrecta"),
         },
         security=[{"Bearer": []}],
     )
     def post(self, request, *args, **kwargs):
+        """
+        Crea una nueva publicación con los datos proporcionados.
+        """
         return super().post(request, *args, **kwargs)
 
 
 class DeletePostView(DestroyAPIView):
+    """
+    Vista para eliminar una publicación por su ID.
+    """
     serializer_class = PostSerializer
     queryset = Post.objects.all()
 
     @swagger_auto_schema(
-        operation_summary="Delete a post",
-        operation_description="Delete a post by ID. Requires a valid JWT token.",
+        operation_summary="Eliminar una publicación",
+        operation_description="Elimina una publicación por su ID. Requiere un token JWT válido.",
         responses={
-            204: openapi.Response(description="Post deleted"),
-            404: openapi.Response(description="Not Found"),
+            204: openapi.Response(description="Publicación eliminada"),
+            404: openapi.Response(description="No encontrada"),
         },
         security=[{"Bearer": []}],
     )
     def delete(self, request, *args, **kwargs):
+        """
+        Elimina la publicación especificada por su ID.
+        """
         return super().delete(request, *args, **kwargs)
 
 
 class UpdatePostView(UpdateAPIView):
+    """
+    Vista para actualizar una publicación existente por su ID.
+    """
     serializer_class = PostSerializer
     queryset = Post.objects.all()
 
     @swagger_auto_schema(
-        operation_summary="Update a post",
-        operation_description="Update a post by ID. Requires a valid JWT token.",
+        operation_summary="Actualizar una publicación",
+        operation_description="Actualiza una publicación por su ID. Requiere un token JWT válido.",
         request_body=PostSerializer,
         responses={
             200: PostSerializer,
-            404: openapi.Response(description="Not Found"),
+            404: openapi.Response(description="No encontrada"),
         },
         security=[{"Bearer": []}],
     )
     def patch(self, request, *args, **kwargs):
+        """
+        Actualiza los datos de la publicación especificada.
+        """
         return super().patch(request, *args, **kwargs)
 
 
 class CommentsView(APIView):
+    """
+    Vista para gestionar los comentarios de las publicaciones.
+    """
 
     @swagger_auto_schema(
-        operation_summary="Retrieve comments for a specific post",
-        operation_description="Fetches all comments associated with a given post ID. Requires a valid JWT token.",
+        operation_summary="Obtener comentarios de una publicación",
+        operation_description="Obtiene todos los comentarios asociados a una publicación específica. Requiere un token JWT válido.",
         manual_parameters=[
             openapi.Parameter(
                 "post_id",
                 openapi.IN_QUERY,
-                description="ID of the post to retrieve comments for",
+                description="ID de la publicación para obtener comentarios",
                 type=openapi.TYPE_INTEGER,
                 required=True,
             ),
@@ -105,17 +159,20 @@ class CommentsView(APIView):
         responses={
             200: CommentSerializer(many=True),
             400: openapi.Response(
-                description="Bad Request",
+                description="Solicitud incorrecta",
                 examples={"application/json": {"error": "post_id is required."}},
             ),
             404: openapi.Response(
-                description="Not Found",
+                description="No encontrada",
                 examples={"application/json": {"error": "Post not found."}},
             ),
         },
         security=[{"Bearer": []}],
     )
     def get(self, request, *args, **kwargs):
+        """
+        Devuelve los comentarios de una publicación específica.
+        """
         post_id = request.query_params.get("post_id", None)
         if not post_id:
             return Response(
@@ -134,42 +191,45 @@ class CommentsView(APIView):
             )
 
     @swagger_auto_schema(
-        operation_summary="Create a new comment",
-        operation_description="Creates a new comment for a specific post. Requires a valid JWT token.",
+        operation_summary="Crear un comentario",
+        operation_description="Crea un nuevo comentario para una publicación específica. Requiere un token JWT válido.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=["post_id", "content"],
             properties={
                 "post_id": openapi.Schema(
                     type=openapi.TYPE_INTEGER,
-                    description="ID of the post to comment on",
+                    description="ID de la publicación a comentar",
                 ),
                 "content": openapi.Schema(
-                    type=openapi.TYPE_STRING, description="Content of the comment"
+                    type=openapi.TYPE_STRING, description="Contenido del comentario"
                 ),
             },
         ),
         responses={
             201: openapi.Response(
-                description="Comment created",
+                description="Comentario creado",
                 examples={
                     "application/json": {"message": "Comment created successfully"}
                 },
             ),
             400: openapi.Response(
-                description="Bad Request",
+                description="Solicitud incorrecta",
                 examples={
                     "application/json": {"error": "post_id and content are required."}
                 },
             ),
             404: openapi.Response(
-                description="Not Found",
+                description="No encontrada",
                 examples={"application/json": {"message": "Post not found"}},
             ),
         },
         security=[{"Bearer": []}],
     )
     def post(self, request, *args, **kwargs):
+        """
+        Crea un comentario en una publicación específica.
+        """
         post_id = request.data.get("post_id", None)
         content = request.data.get("content", None)
         if not post_id or not content:
@@ -191,29 +251,29 @@ class CommentsView(APIView):
             )
 
     @swagger_auto_schema(
-        operation_summary="Update an existing comment",
-        operation_description="Updates the content of a specific comment. Requires a valid JWT token.",
+        operation_summary="Actualizar un comentario",
+        operation_description="Actualiza el contenido de un comentario específico. Requiere un token JWT válido.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=["comment_id", "content"],
             properties={
                 "comment_id": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="ID of the comment to update"
+                    type=openapi.TYPE_INTEGER, description="ID del comentario a actualizar"
                 ),
                 "content": openapi.Schema(
-                    type=openapi.TYPE_STRING, description="New content for the comment"
+                    type=openapi.TYPE_STRING, description="Nuevo contenido del comentario"
                 ),
             },
         ),
         responses={
             200: openapi.Response(
-                description="Comment updated",
+                description="Comentario actualizado",
                 examples={
                     "application/json": {"message": "Comment updated successfully"}
                 },
             ),
             400: openapi.Response(
-                description="Bad Request",
+                description="Solicitud incorrecta",
                 examples={
                     "application/json": {
                         "error": "comment_id and content are required."
@@ -221,13 +281,16 @@ class CommentsView(APIView):
                 },
             ),
             404: openapi.Response(
-                description="Not Found",
+                description="No encontrado",
                 examples={"application/json": {"message": "Comment not found"}},
             ),
         },
         security=[{"Bearer": []}],
     )
     def patch(self, request, *args, **kwargs):
+        """
+        Actualiza el contenido de un comentario existente.
+        """
         comment_id = request.data.get("comment_id", None)
         content = request.data.get("content", None)
         if not comment_id or not content:
@@ -250,36 +313,39 @@ class CommentsView(APIView):
             )
 
     @swagger_auto_schema(
-        operation_summary="Delete a comment",
-        operation_description="Deletes a specific comment. Requires a valid JWT token.",
+        operation_summary="Eliminar un comentario",
+        operation_description="Elimina un comentario específico. Requiere un token JWT válido.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=["comment_id"],
             properties={
                 "comment_id": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="ID of the comment to delete"
+                    type=openapi.TYPE_INTEGER, description="ID del comentario a eliminar"
                 ),
             },
         ),
         responses={
             204: openapi.Response(
-                description="Comment deleted",
+                description="Comentario eliminado",
                 examples={
                     "application/json": {"message": "Comment deleted successfully"}
                 },
             ),
             400: openapi.Response(
-                description="Bad Request",
+                description="Solicitud incorrecta",
                 examples={"application/json": {"error": "comment_id is required."}},
             ),
             404: openapi.Response(
-                description="Not Found",
+                description="No encontrado",
                 examples={"application/json": {"message": "Comment not found"}},
             ),
         },
         security=[{"Bearer": []}],
     )
     def delete(self, request, *args, **kwargs):
+        """
+        Elimina un comentario específico.
+        """
         comment_id = request.data.get("comment_id", None)
         if not comment_id:
             return Response(
@@ -301,15 +367,18 @@ class CommentsView(APIView):
 
 
 class LikePostView(APIView):
+    """
+    Vista para dar o quitar 'me gusta' a una publicación.
+    """
 
     @swagger_auto_schema(
-        operation_summary="Like a post",
-        operation_description="Like a post by ID. Requires a valid JWT token.",
+        operation_summary="Dar me gusta a una publicación",
+        operation_description="Da me gusta a una publicación por su ID. Requiere un token JWT válido.",
         manual_parameters=[
             openapi.Parameter(
                 "post_id",
                 openapi.IN_PATH,
-                description="ID of the post to like",
+                description="ID de la publicación a dar me gusta",
                 type=openapi.TYPE_INTEGER,
                 required=True,
             ),
@@ -322,6 +391,9 @@ class LikePostView(APIView):
         security=[{"Bearer": []}],
     )
     def post(self, request, post_id):
+        """
+        Da me gusta a una publicación específica.
+        """
         try:
             post = Post.objects.get(id=post_id)
             like, created = Like.objects.get_or_create(user=request.user, post=post)
@@ -340,13 +412,13 @@ class LikePostView(APIView):
             )
 
     @swagger_auto_schema(
-        operation_summary="Unlike a post",
-        operation_description="Unlike a post by ID. Requires a valid JWT token.",
+        operation_summary="Quitar me gusta a una publicación",
+        operation_description="Quita el me gusta de una publicación por su ID. Requiere un token JWT válido.",
         manual_parameters=[
             openapi.Parameter(
                 "post_id",
                 openapi.IN_PATH,
-                description="ID of the post to unlike",
+                description="ID de la publicación para quitar me gusta",
                 type=openapi.TYPE_INTEGER,
                 required=True,
             ),
@@ -358,6 +430,9 @@ class LikePostView(APIView):
         security=[{"Bearer": []}],
     )
     def delete(self, request, post_id):
+        """
+        Quita el me gusta de una publicación específica.
+        """
         try:
             post = Post.objects.get(id=post_id)
             like = Like.objects.get(user=request.user, post=post)
@@ -376,27 +451,33 @@ class LikePostView(APIView):
 
 
 class FavoritePostView(APIView):
+    """
+    Vista para gestionar publicaciones favoritas del usuario.
+    """
 
     @swagger_auto_schema(
-        operation_summary="Check if a post is favorited",
-        operation_description="Check if a post is favorited by the user. Requires a valid JWT token.",
+        operation_summary="Verificar si una publicación es favorita",
+        operation_description="Verifica si una publicación es favorita para el usuario autenticado. Requiere un token JWT válido.",
         manual_parameters=[
             openapi.Parameter(
                 "post_id",
                 openapi.IN_QUERY,
-                description="ID of the post to check",
+                description="ID de la publicación a verificar",
                 type=openapi.TYPE_INTEGER,
                 required=True,
             ),
         ],
         responses={
-            200: openapi.Response(description="Favorite status"),
-            400: openapi.Response(description="post_id is required"),
-            404: openapi.Response(description="Post not found"),
+            200: openapi.Response(description="Estado de favorito"),
+            400: openapi.Response(description="post_id es requerido"),
+            404: openapi.Response(description="Publicación no encontrada"),
         },
         security=[{"Bearer": []}],
     )
     def get(self, request):
+        """
+        Verifica si una publicación es favorita para el usuario autenticado.
+        """
         post_id = request.query_params.get("post_id", None)
         if not post_id:
             return Response(
@@ -418,28 +499,31 @@ class FavoritePostView(APIView):
             )
 
     @swagger_auto_schema(
-        operation_summary="Favorite a post",
-        operation_description="Favorite a post by ID. Requires a valid JWT token.",
+        operation_summary="Agregar una publicación a favoritos",
+        operation_description="Agrega una publicación a favoritos por su ID. Requiere un token JWT válido.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=["post_id"],
             properties={
                 "post_id": openapi.Schema(
                     type=openapi.TYPE_INTEGER,
-                    description="ID of the post to favorite",
+                    description="ID de la publicación a agregar a favoritos",
                 ),
             },
         ),
         responses={
-            201: openapi.Response(description="Post favorited"),
+            201: openapi.Response(description="Publicación agregada a favoritos"),
             400: openapi.Response(
-                description="Post already favorited or post_id is required"
+                description="Ya es favorita o post_id es requerido"
             ),
-            404: openapi.Response(description="Post not found"),
+            404: openapi.Response(description="Publicación no encontrada"),
         },
         security=[{"Bearer": []}],
     )
     def post(self, request):
+        """
+        Agrega una publicación a favoritos del usuario autenticado.
+        """
         post_id = request.data.get("post_id", None)
         if not post_id:
             return Response(
@@ -464,26 +548,29 @@ class FavoritePostView(APIView):
             )
 
     @swagger_auto_schema(
-        operation_summary="Unfavorite a post",
-        operation_description="Unfavorite a post by ID. Requires a valid JWT token.",
+        operation_summary="Quitar una publicación de favoritos",
+        operation_description="Quita una publicación de favoritos por su ID. Requiere un token JWT válido.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=["post_id"],
             properties={
                 "post_id": openapi.Schema(
                     type=openapi.TYPE_INTEGER,
-                    description="ID of the post to unfavorite",
+                    description="ID de la publicación a quitar de favoritos",
                 ),
             },
         ),
         responses={
-            204: openapi.Response(description="Post unfavorited"),
-            400: openapi.Response(description="post_id is required"),
-            404: openapi.Response(description="Post or Favorite not found"),
+            204: openapi.Response(description="Publicación eliminada de favoritos"),
+            400: openapi.Response(description="post_id es requerido"),
+            404: openapi.Response(description="Publicación o favorito no encontrado"),
         },
         security=[{"Bearer": []}],
     )
     def delete(self, request):
+        """
+        Quita una publicación de favoritos del usuario autenticado.
+        """
         post_id = request.data.get("post_id", None)
         if not post_id:
             return Response(

@@ -140,49 +140,116 @@ class AuthenticationTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(response.data["Validated"], True)
 
-    def test_reset_password(self):
-        # Test resetting the password
+    def test_reset_password_with_valid_code(self):
+        """
+        Test para cambiar la contraseña usando un código de verificación válido (usuario no autenticado).
+        """
+        # Crear código de verificación y asociarlo al usuario
+        code = CodesVerification.objects.create(
+            changePasswordCode="654321", user=self.user, is_used=False
+        )
+        # Validar el código (simula el endpoint de validación)
+        code.is_used = True
+        code.save()
+
         url = reverse("reset-password")
-
-        response = self._login_user()
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
         data = {
+            "code": code.changePasswordCode,
+            "email": self.user.email,
             "new_password": "newpassword123",
             "confirm_password": "newpassword123",
         }
-
-        response = self.client.post(
-            url,
-            data,
-            format="json",
-            HTTP_AUTHORIZATION=f"Bearer {response.data['access']}",
-        )
-
+        response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["Message"], "Password changed successfully")
 
-    def test_password_must_be_same(self):
-        # Test that the new password and confirm password must be the same
+        # Verifica que la contraseña realmente cambió
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("newpassword123"))
+
+    def test_reset_password_with_invalid_code(self):
+        """
+        Test para intentar cambiar la contraseña con un código inválido.
+        """
         url = reverse("reset-password")
-
-        response = self._login_user()
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
         data = {
+            "code": "codigo_invalido",
+            "email": self.user.email,
             "new_password": "newpassword123",
-            "confirm_password": "differentpassword",
+            "confirm_password": "newpassword123",
         }
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(
+            response.data["Validated"], False
+        )
 
+    def test_change_password_authenticated(self):
+        """
+        Test para cambiar la contraseña desde ajustes (usuario autenticado).
+        """
+        # Login para obtener token
+        login_response = self._login_user()
+        access_token = login_response.data["access"]
+
+        url = reverse("change-password")
+        data = {
+            "current_password": "testpassword",
+            "new_password": "nuevoajustes123",
+            "confirm_password": "nuevoajustes123",
+        }
         response = self.client.post(
             url,
             data,
             format="json",
-            HTTP_AUTHORIZATION=f"Bearer {response.data['access']}",
+            HTTP_AUTHORIZATION=f"Bearer {access_token}",
         )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("Contraseña cambiada correctamente", response.data["message"])
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["Message"],
-            "The new password must be the same as the old one",
+        # Verifica que la contraseña realmente cambió
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("nuevoajustes123"))
+
+    def test_change_password_wrong_current(self):
+        """
+        Test para intentar cambiar la contraseña desde ajustes con la contraseña actual incorrecta.
+        """
+        login_response = self._login_user()
+        access_token = login_response.data["access"]
+
+        url = reverse("change-password")
+        data = {
+            "current_password": "incorrecta",
+            "new_password": "nuevoajustes123",
+            "confirm_password": "nuevoajustes123",
+        }
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {access_token}",
         )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("Contraseña actual incorrecta", response.data["error"])
+
+    def test_change_password_mismatch(self):
+        """
+        Test para intentar cambiar la contraseña desde ajustes con confirmación incorrecta.
+        """
+        login_response = self._login_user()
+        access_token = login_response.data["access"]
+
+        url = reverse("change-password")
+        data = {
+            "current_password": "testpassword",
+            "new_password": "nuevoajustes123",
+            "confirm_password": "diferente",
+        }
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {access_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Las contraseñas no coinciden", response.data["error"])
