@@ -1,3 +1,4 @@
+from datetime import timedelta
 from django.db import models
 from django.shortcuts import render
 from drf_yasg import openapi
@@ -7,6 +8,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import CreateAPIView, DestroyAPIView, UpdateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.utils import timezone
 
 from .models import Comment, Favorite, Like, Post
 from .serializers import (
@@ -52,6 +54,15 @@ class ListPostsOwnerView(APIView):
     @swagger_auto_schema(
         operation_summary="Listar todas las publicaciones",
         operation_description="Lista todas las publicaciones del ususario.",
+        manual_parameters=[
+            openapi.Parameter(
+                "user_id",
+                openapi.IN_QUERY,
+                description="ID del usuario para filtrar las publicaciones",
+                type=openapi.TYPE_INTEGER,
+                required=True,
+            ),
+        ],
         responses={200: PostSerializer(many=True)},
         security=[{"Bearer": []}],
     )
@@ -69,16 +80,47 @@ class ListPostsOwnerView(APIView):
         serializer = PostSerializer(posts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
 class CreatePostView(CreateAPIView):
     """
     Vista para crear una nueva publicación.
     """
+
     serializer_class = PostSerializer
 
     @swagger_auto_schema(
         operation_summary="Crear una publicación",
         operation_description="Crea una nueva publicación. Requiere un token JWT válido.",
-        request_body=PostSerializer,
+        manual_parameters=[
+            openapi.Parameter(
+                "title",
+                openapi.IN_QUERY,
+                description="Título de la publicación",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                "content",
+                openapi.IN_QUERY,
+                description="Contenido de la publicación",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                "image",
+                openapi.IN_QUERY,
+                description="Imagen de la publicación (opcional)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "tags",
+                openapi.IN_QUERY,
+                description="Etiquetas de la publicación (opcional, separadas por comas)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+        ],
         responses={
             201: PostSerializer,
             400: openapi.Response(description="Solicitud incorrecta"),
@@ -92,12 +134,12 @@ class CreatePostView(CreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-class DeletePostView(DestroyAPIView):
+class DeletePostView(APIView):
     """
     Vista para eliminar una publicación por su ID.
     """
+
     serializer_class = PostSerializer
-    queryset = Post.objects.all()
 
     @swagger_auto_schema(
         operation_summary="Eliminar una publicación",
@@ -108,19 +150,33 @@ class DeletePostView(DestroyAPIView):
         },
         security=[{"Bearer": []}],
     )
-    def delete(self, request, *args, **kwargs):
+    def delete(self, request, post_id, *args, **kwargs):
         """
         Elimina la publicación especificada por su ID.
         """
-        return super().delete(request, *args, **kwargs)
+
+        try:
+            post = Post.objects.get(id=post_id)
+            if post.author != request.user:
+                return Response(
+                    {"error": "You do not have permission to delete this post."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            post.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Post.DoesNotExist:
+            return Response(
+                {"error": "Post not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
 
 class UpdatePostView(UpdateAPIView):
     """
     Vista para actualizar una publicación existente por su ID.
     """
+
     serializer_class = PostSerializer
-    queryset = Post.objects.all()
 
     @swagger_auto_schema(
         operation_summary="Actualizar una publicación",
@@ -132,11 +188,35 @@ class UpdatePostView(UpdateAPIView):
         },
         security=[{"Bearer": []}],
     )
-    def patch(self, request, *args, **kwargs):
+    def patch(self, request, post_id, *args, **kwargs):
         """
         Actualiza los datos de la publicación especificada.
         """
-        return super().patch(request, *args, **kwargs)
+        try:
+            post = Post.objects.get(id=post_id)
+            if post.author != request.user:
+                return Response(
+                    {"error": "You do not have permission to update this post."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Validación de las 24 horas
+            if timezone.now() > post.created_at + timedelta(hours=24):
+                return Response(
+                    {
+                        "error": "No se puede actualizar la publicación después de 24 horas de su creación."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            serializer = self.get_serializer(post, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Post.DoesNotExist:
+            return Response(
+                {"error": "Post not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
 
 class CommentsView(APIView):
@@ -258,10 +338,12 @@ class CommentsView(APIView):
             required=["comment_id", "content"],
             properties={
                 "comment_id": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="ID del comentario a actualizar"
+                    type=openapi.TYPE_INTEGER,
+                    description="ID del comentario a actualizar",
                 ),
                 "content": openapi.Schema(
-                    type=openapi.TYPE_STRING, description="Nuevo contenido del comentario"
+                    type=openapi.TYPE_STRING,
+                    description="Nuevo contenido del comentario",
                 ),
             },
         ),
@@ -320,7 +402,8 @@ class CommentsView(APIView):
             required=["comment_id"],
             properties={
                 "comment_id": openapi.Schema(
-                    type=openapi.TYPE_INTEGER, description="ID del comentario a eliminar"
+                    type=openapi.TYPE_INTEGER,
+                    description="ID del comentario a eliminar",
                 ),
             },
         ),
@@ -513,9 +596,7 @@ class FavoritePostView(APIView):
         ),
         responses={
             201: openapi.Response(description="Publicación agregada a favoritos"),
-            400: openapi.Response(
-                description="Ya es favorita o post_id es requerido"
-            ),
+            400: openapi.Response(description="Ya es favorita o post_id es requerido"),
             404: openapi.Response(description="Publicación no encontrada"),
         },
         security=[{"Bearer": []}],

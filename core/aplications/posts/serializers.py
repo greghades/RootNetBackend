@@ -9,8 +9,9 @@ class PostSerializer(serializers.ModelSerializer):
     author = serializers.SlugRelatedField(
         slug_field="username", queryset=CustomUser.objects.all(), required=False
     )
-    created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
-    updated_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
+    created_at = serializers.DateTimeField(format="%d/%m/%Y/%H/%M", read_only=True)
+    updated_at = serializers.DateTimeField(format="%d/%m/%Y/%H/%M", read_only=True)
+    image = serializers.ImageField(required=False, allow_null=True, use_url=True)
 
     class Meta:
         model = Post
@@ -33,7 +34,7 @@ class PostSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        validated_data.pop("author", None)  # Evita cambiar el autor en update
+        validated_data.pop("author", None)
         return super().update(instance, validated_data)
 
 
@@ -71,6 +72,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
     post = serializers.PrimaryKeyRelatedField(queryset=Post.objects.all())
     created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
     updated_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
+
     class Meta:
         model = Favorite
         exclude = ("id",)
