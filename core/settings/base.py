@@ -40,6 +40,7 @@ DEFAULT_APPS = [
 LOCAL_APPS = [
     "aplications.authentication",
     "aplications.posts",
+    "aplications.users"
 ]
 
 THIRD_PARTY_APPS = [
@@ -47,6 +48,7 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
+    "drf_yasg",
 ]
 
 INSTALLED_APPS = DEFAULT_APPS + LOCAL_APPS + THIRD_PARTY_APPS
@@ -122,6 +124,18 @@ SIMPLE_JWT = {
     "TOKEN_TYPE_CLAIM": "token_type",
     "TOKEN_BLACKLIST_ENABLED": True,
     "TOKEN_OBTAIN_SERIALIZER": "aplications.authentication.serializers.CustomTokenObtainPairSerializer",
+}
+# swagger
+SWAGGER_SETTINGS = {
+    "SECURITY_DEFINITIONS": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "Enter your JWT token in the format: Bearer <your-token-here>",
+        },
+    },
+    "USE_SESSION_AUTH": False,  # Desactiva la autenticación de sesión para enfocarte en JWT
 }
 
 # Password validation
