@@ -34,7 +34,6 @@ class ProfileView(generics.GenericAPIView):
         },
         security=[{"Bearer": []}],
     )
-
     def put(self, request, *args, **kwargs):
         user = request.user
         serializer = CustomUserSerializer(user, data=request.data, partial=True)
@@ -45,24 +44,53 @@ class ProfileView(generics.GenericAPIView):
 
 
 class FollowUserView(generics.GenericAPIView):
-
+    @swagger_auto_schema(
+        operation_summary="Follow a user",
+        operation_description="Authenticated user follows another user. Requires a valid JWT token.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["followed"],
+            properties={
+                "followed": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the user to follow"),
+            },
+        ),
+        responses={
+            201: FollowSerializer,
+            400: openapi.Response(description="Bad Request"),
+        },
+        security=[{"Bearer": []}],
+    )
     def post(self, request, *args, **kwargs) -> Response:
-
         follow_data = {
             "follower": request.user.id,
             "followed": request.data.get("followed", None)
         }
-
         serializer = FollowSerializer(data=follow_data)
         if serializer.is_valid(raise_exception=True):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class UnfollowUserView(generics.GenericAPIView):
+    @swagger_auto_schema(
+        operation_summary="Unfollow a user",
+        operation_description="Authenticated user unfollows another user. Requires a valid JWT token.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["followed"],
+            properties={
+                "followed": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the user to unfollow"),
+            },
+        ),
+        responses={
+            200: openapi.Response(description="Unfollowed successfully"),
+            400: openapi.Response(description="Bad Request"),
+        },
+        security=[{"Bearer": []}],
+    )
     def post(self, request, *args, **kwargs) -> Response:
         try:
-        
             follow = Follow.objects.get(
                 follower=request.user.id,
                 followed=request.data.get("followed", None)
@@ -70,5 +98,4 @@ class UnfollowUserView(generics.GenericAPIView):
             follow.delete()
             return Response({"message": "Unfollowed successfully"}, status=status.HTTP_200_OK)
         except Follow.DoesNotExist as e:
-            
             return Response({"error": "Follow relationship does not exist"}, status=status.HTTP_400_BAD_REQUEST)

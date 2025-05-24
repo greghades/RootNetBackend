@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from .models import Comment, Like, Post
+from .models import Comment, Like, Post, Favorite
 
 # Create your tests here.
 
@@ -98,7 +98,7 @@ class PostTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
-    
+
     def test_edit_comment(self):
         # Create a post and a comment first
         post = Post.objects.create(
@@ -128,7 +128,7 @@ class PostTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         comment.refresh_from_db()
         self.assertEqual(comment.content, "This is an edited comment.")
-    
+
     def test_delete_comment(self):
         # Create a post and a comment first
         post = Post.objects.create(
@@ -156,3 +156,168 @@ class PostTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Comment.objects.count(), 0)
+
+    def test_like_post(self):
+        # Create a post first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+
+        url = reverse("like-service", args=[post.id])
+        token_response = self._login_user()
+
+        response = self.client.post(
+            url,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Like.objects.count(), 1)
+
+    def test_unlike_post(self):
+        # Create a post and like it first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+        Like.objects.create(
+            post=post,
+            user=self.user,
+        )
+
+        url = reverse("like-service", args=[post.id])
+        token_response = self._login_user()
+
+        response = self.client.delete(
+            url,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Like.objects.count(), 0)
+
+    def test_already_liked_post(self):
+        # Create a post and like it first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+        Like.objects.create(
+            post=post,
+            user=self.user,
+        )
+
+        url = reverse("like-service", args=[post.id])
+        token_response = self._login_user()
+
+        response = self.client.post(
+            url,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Like.objects.count(), 1)
+    
+
+    def test_favorite_post(self):
+        # Create a post first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+
+        url = reverse("favorite-service")
+        token_response = self._login_user()
+
+        data = {
+            "post_id": post.id,
+        }
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+    
+    def test_delete_favorite_post(self):
+        # Create a post and favorite it first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+        Favorite.objects.create(
+            post=post,
+            user=self.user,
+        )
+
+        url = reverse("favorite-service")
+        token_response = self._login_user()
+
+        data = {
+            "post_id": post.id,
+        }
+        response = self.client.delete(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Favorite.objects.count(), 0)
+    
+    def test_already_favorited_post(self):
+        # Create a post and favorite it first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+        Favorite.objects.create(
+            post=post,
+            user=self.user,
+        )
+
+        url = reverse("favorite-service")
+        token_response = self._login_user()
+
+        data = {
+            "post_id": post.id,
+        }
+        response = self.client.post(
+            url,
+            data,
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Favorite.objects.count(), 1)
+
+    def test_get_favorites(self):
+        # Create a post and favorite it first
+        post = Post.objects.create(
+            content="This is a test post.",
+            author=self.user,
+        )
+        Favorite.objects.create(
+            post=post,
+            user=self.user,
+        )
+
+        url = reverse("favorite-service")
+        token_response = self._login_user()
+
+        response = self.client.get(
+            url +"?post_id=" + str(post.id),
+            format="json",
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
