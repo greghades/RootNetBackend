@@ -135,4 +135,6 @@ docker-compose down -v
 
 --- 
 ## 🌐 Documentacion de Endpoints
-- [Postman Documentation](https://documenter.getpostman.com/view/22630596/2sB2j98UwP)
+- [URL Documentation Swagger](http://localhost:8001/doc/)
+- [URL Documentation alternativo Swagger](http://localhost:8001/redoc/)
+
