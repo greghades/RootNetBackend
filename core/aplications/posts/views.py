@@ -1,6 +1,8 @@
 from datetime import timedelta
+
 from django.db import models
 from django.shortcuts import render
+from django.utils import timezone
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
@@ -8,7 +10,6 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import CreateAPIView, DestroyAPIView, UpdateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.utils import timezone
 
 from .models import Comment, Favorite, Like, Post
 from .serializers import (
@@ -91,36 +92,24 @@ class CreatePostView(CreateAPIView):
     @swagger_auto_schema(
         operation_summary="Crear una publicación",
         operation_description="Crea una nueva publicación. Requiere un token JWT válido.",
-        manual_parameters=[
-            openapi.Parameter(
-                "title",
-                openapi.IN_QUERY,
-                description="Título de la publicación",
-                type=openapi.TYPE_STRING,
-                required=True,
+        properties={
+            "author": openapi.Schema(
+                type=openapi.TYPE_INTEGER,
+                description="ID del autor de la publicación",
             ),
-            openapi.Parameter(
-                "content",
-                openapi.IN_QUERY,
-                description="Contenido de la publicación",
-                type=openapi.TYPE_STRING,
-                required=True,
+            "content": openapi.Schema(
+                type=openapi.TYPE_STRING, description="Contenido de la publicación"
             ),
-            openapi.Parameter(
-                "image",
-                openapi.IN_QUERY,
-                description="Imagen de la publicación (opcional)",
+            "image": openapi.Schema(
                 type=openapi.TYPE_STRING,
-                required=False,
+                description="URL de la imagen asociada a la publicación",
             ),
-            openapi.Parameter(
-                "tags",
-                openapi.IN_QUERY,
-                description="Etiquetas de la publicación (opcional, separadas por comas)",
-                type=openapi.TYPE_STRING,
-                required=False,
+            "tags": openapi.Schema(
+                type=openapi.TYPE_ARRAY,
+                items=openapi.Items(type=openapi.TYPE_STRING),
+                description="Lista de etiquetas asociadas a la publicación",
             ),
-        ],
+        },
         responses={
             201: PostSerializer,
             400: openapi.Response(description="Solicitud incorrecta"),

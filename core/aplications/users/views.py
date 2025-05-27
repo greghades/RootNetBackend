@@ -61,6 +61,7 @@ class UserProfileView(generics.GenericAPIView):
     """
     Vista para obtener el perfil de un usuario.
     """
+    serializer_class = CustomUserProfileSerializer
 
     def get(self, request, username, *args, **kwargs):
 
