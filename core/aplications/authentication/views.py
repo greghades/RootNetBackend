@@ -79,7 +79,7 @@ class LoginView(TokenObtainPairView):
     )
     def post(self, request, *args, **kwargs):
 
-        email = request.data.get("email", None)
+        email = request.data.get("email", None).lower()
         password = request.data.get("password", None)
         user = authenticate(username=email, password=password)
 
