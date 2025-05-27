@@ -1,15 +1,17 @@
+from aplications.posts.serializers import PostSerializer, SocialMediaCursorPagination
 from django.shortcuts import get_object_or_404, render
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import generics, status
 from rest_framework.response import Response
+
 from .models import Follow
 from .serializers import (
-    FollowSerializer,
-    CustomUserSettingsSerializer,
+    CustomUser,
     CustomUserProfileSerializer,
-    CustomUser
+    CustomUserSettingsSerializer,
+    FollowSerializer,
 )
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
 
 # Create your views here.
 
@@ -57,19 +59,37 @@ class ProfileSettingsView(generics.GenericAPIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class UserProfileView(generics.GenericAPIView):
     """
-    Vista para obtener el perfil de un usuario.
+    Vista para obtener el perfil de un usuario con posts paginados (scroll infinito).
     """
+
     serializer_class = CustomUserProfileSerializer
+    pagination_class = (
+        SocialMediaCursorPagination  # Usa el paginador de scroll infinito
+    )
 
     def get(self, request, username, *args, **kwargs):
-
         if not username:
-            return Response({"error": "Username is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Username is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
         user = get_object_or_404(CustomUser, username=username)
-        serializer = CustomUserProfileSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # Paginar los posts del usuario
+        posts_qs = user.post_set.all().order_by("-created_at")
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(posts_qs, request)
+        posts_serializer = PostSerializer(page, many=True)
+
+        # Serializar el usuario y reemplazar el campo 'posts' por los paginados
+        user_serializer = CustomUserProfileSerializer(user)
+        data = user_serializer.data
+        data["posts"] = posts_serializer.data
+
+        return paginator.get_paginated_response(data)
+
 
 class FollowUserView(generics.GenericAPIView):
     """
@@ -83,7 +103,9 @@ class FollowUserView(generics.GenericAPIView):
             type=openapi.TYPE_OBJECT,
             required=["followed"],
             properties={
-                "followed": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del usuario a seguir"),
+                "followed": openapi.Schema(
+                    type=openapi.TYPE_INTEGER, description="ID del usuario a seguir"
+                ),
             },
         ),
         responses={
@@ -98,7 +120,7 @@ class FollowUserView(generics.GenericAPIView):
         """
         follow_data = {
             "follower": request.user.id,
-            "followed": request.data.get("followed", None)
+            "followed": request.data.get("followed", None),
         }
         serializer = FollowSerializer(data=follow_data)
         if serializer.is_valid(raise_exception=True):
@@ -119,7 +141,10 @@ class UnfollowUserView(generics.GenericAPIView):
             type=openapi.TYPE_OBJECT,
             required=["followed"],
             properties={
-                "followed": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del usuario a dejar de seguir"),
+                "followed": openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="ID del usuario a dejar de seguir",
+                ),
             },
         ),
         responses={
@@ -134,12 +159,14 @@ class UnfollowUserView(generics.GenericAPIView):
         """
         try:
             follow = Follow.objects.get(
-                follower=request.user.id,
-                followed=request.data.get("followed", None)
+                follower=request.user.id, followed=request.data.get("followed", None)
             )
             follow.delete()
             return Response(
                 {"message": "Unfollowed successfully"}, status=status.HTTP_200_OK
             )
         except Follow.DoesNotExist:
-            return Response({"error": "The relationship does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "The relationship does not exist"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
