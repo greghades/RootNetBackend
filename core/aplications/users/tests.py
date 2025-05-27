@@ -25,6 +25,7 @@ class UserViewTestCase(APITestCase):
     def test_get_user_profile(self):
         url = reverse("profile")
         response = self.client.get(url)
+        
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["username"], self.user1.username)

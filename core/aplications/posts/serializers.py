@@ -9,13 +9,33 @@ class PostSerializer(serializers.ModelSerializer):
     author = serializers.SlugRelatedField(
         slug_field="username", queryset=CustomUser.objects.all(), required=False
     )
-    created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
-    updated_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
+    author_first_name = serializers.SerializerMethodField()
+    author_last_name = serializers.SerializerMethodField()
+    comments_count = serializers.SerializerMethodField()
+    favorites_count = serializers.SerializerMethodField()
+    likes_count = serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField(format="%d/%m/%y/%H/%M", read_only=True)
+    updated_at = serializers.DateTimeField(format="%d/%m/%y/%H/%M", read_only=True)
 
     class Meta:
         model = Post
         fields = "__all__"
         read_only_fields = ["created_at", "updated_at"]
+
+    def get_author_first_name(self, obj):
+        return obj.author.first_name
+
+    def get_author_last_name(self, obj):
+        return obj.author.last_name
+
+    def get_comments_count(self, obj):
+        return obj.comments.count()
+
+    def get_favorites_count(self, obj):
+        return obj.favorites.count()
+
+    def get_likes_count(self, obj):
+        return obj.likes.count()
 
     def validate_author(self, value):
         request = self.context.get("request")
